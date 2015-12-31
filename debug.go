@@ -76,6 +76,8 @@ func Enable(pattern string) {
 // Debug creates a debug function for `name` which you call
 // with printf-style arguments in your application or library.
 func Debug(name string) DebugFunction {
+	var mutex sync.Mutex
+
 	prevGlobal := time.Now()
 	color := colors[rand.Intn(len(colors))]
 	prev := time.Now()
@@ -89,10 +91,15 @@ func Debug(name string) DebugFunction {
 			return
 		}
 
+		// adds about 100ns/op by using the lock
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		d := deltas(prevGlobal, prev, color)
 		fmt.Fprintf(writer, d+" \033["+color+"m"+name+"\033[0m - "+format+"\n", args...)
+
 		prevGlobal = time.Now()
-		prev = time.Now()
+		prev = prevGlobal
 	}
 }
 

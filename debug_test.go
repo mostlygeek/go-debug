@@ -1,7 +1,11 @@
 package debug
 
 import "testing"
-import "strings"
+
+import (
+	"strings"
+	"sync"
+)
 import "bytes"
 import "time"
 
@@ -117,6 +121,36 @@ func TestEnableDisable(t *testing.T) {
 	}
 }
 
+// TestRace helps reveal race conditions. Use it like this:
+// go test -v -run TestRace -race
+func TestRace(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping")
+	}
+
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	SetWriter(buf)
+
+	Enable("foo")
+	foo := Debug("foo")
+
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for d := 0; d < 100; d++ {
+				foo("f")
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
 func ExampleEnable() {
 	Enable("mongo:connection")
 	Enable("mongo:*")
@@ -133,6 +167,18 @@ func ExampleDebug() {
 		debug("send email to %s", "loki@segment.io")
 		debug("send email to %s", "jane@segment.io")
 		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func BenchmarkEnabled(b *testing.B) {
+	var out []byte
+	buf := bytes.NewBuffer(out)
+	SetWriter(buf)
+
+	Enable("foo")
+	foo := Debug("foo")
+	for i := 0; i < b.N; i++ {
+		foo("stuff")
 	}
 }
 
